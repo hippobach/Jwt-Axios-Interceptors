@@ -1,5 +1,3 @@
-import axios from 'axios';
-import { toast } from 'react-toastify';
 import { useEffect, useState } from 'react';
 
 import Box from '@mui/material/Box';
@@ -9,19 +7,17 @@ import Typography from '@mui/material/Typography';
 import CircularProgress from '@mui/material/CircularProgress';
 
 import { API_ROOT } from '~/utils/constants';
+import authorizedAxiosInstance from '~/utils/authorizedAxios';
 
 function Dashboard() {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
     const fetchData = async () => {
-      try {
-        const res = await axios.get(`${API_ROOT}/v1/dashboards/access`);
-        console.log(res.data);
-        setUser(res.data);
-      } catch (error) {
-        toast.error(error.response?.data?.message || error?.message);
-      }
+      const res = await authorizedAxiosInstance.get(
+        `${API_ROOT}/v1/dashboards/access`
+      );
+      setUser(res.data);
     };
     fetchData();
   }, []);
