@@ -14,7 +14,13 @@ authorizedAxiosInstance.defaults.timeout = 1000 * 60 * 10;
 // Add a request interceptor: can thiệp vào giữa những request API
 authorizedAxiosInstance.interceptors.request.use(
   (config) => {
-    // Do something before request is sent
+    // Lấy access token từ local storage và đính kèm vào header
+    const accessToken = localStorage.getItem('access_token');
+    if (accessToken) {
+      // Nếu có access token, thêm vào header Authorization với phương thức Bearer và token
+      // Cần thêm 'Bearer' vì cần tuân thủ theo tiêu chuẩn OAuth 2.0 trong việc xác định loại token đang sử dụng
+      config.headers.Authorization = `Bearer ${accessToken}`;
+    }
     return config;
   },
   (error) => {
