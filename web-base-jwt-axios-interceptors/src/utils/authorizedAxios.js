@@ -30,6 +30,10 @@ authorizedAxiosInstance.interceptors.request.use(
   }
 );
 
+// Khởi tạo một promise cho việc gọi api refresh token
+// Mục đích tạo promise này để khi nhận yêu cầu refreshToken đầu tiên thì hold lại việc gọi API refresh cho tới khi xong thì mới retry lại những API bị lỗi trước đó thay vì gọi lại API refresh liên tục với mỗi request lỗi
+let refreshTokenPromise = null;
+
 // Add a response interceptor: can thiệp vào những response API
 authorizedAxiosInstance.interceptors.response.use(
   (response) => {
@@ -52,32 +56,39 @@ authorizedAxiosInstance.interceptors.response.use(
     // Nếu như nhận mã 410 từ BE thì gọi api refresh token
     // Đầu tiên lấy được các request API đang bị lỗi thông qua error.config
     const originalRequest = error.config;
-    if (error.response?.status === 410 && !originalRequest._retry) {
-      // Gán thêm một giá trị _retry luôn  = true trong khoảng thời gian chờ, để việc refresh token chỉ luôn gọi 1 lần tại 1 thời điểm
-      originalRequest._retry = true;
+    if (error.response?.status === 410 && originalRequest) {
       // Lấy refreshToken từ localStorage
-      const refreshToken = localStorage.getItem('refreshToken');
-      //  Gọi api refresh token
-      return refreshTokenAPI(refreshToken)
-        .then((res) => {
-          // Lấy và gán lại access token vào localStorage
-          const { accessToken } = res.data;
-          localStorage.setItem('accessToken', accessToken);
-          authorizedAxiosInstance.defaults.headers.Authorization = `Bearer ${accessToken}`;
 
-          // Trường hợp dùng cookie, return lại axios instance của chúng ta kết hợp với cái originalRequest để gọi lại những api ban đầu bị lỗi
-          return authorizedAxiosInstance(originalRequest);
-        })
-        .catch((_error) => {
-          // Nếu như nhận bất kỳ lỗi nào từ api refreshToken thì logout luôn
-          handleLogoutAPI().then(() => {
-            // Trường hợp dùng cookie thì nhớ xóa userInfo trong localStorage
-            // localStorage.removeItem('userInfo');
-            // Điều hướng tới trang login sau khi logout thành công
-            location.href = '/login';
+      if (!refreshTokenPromise) {
+        const refreshToken = localStorage.getItem('refreshToken');
+        //  Gọi api refresh token
+        refreshTokenPromise = refreshTokenAPI(refreshToken)
+          .then((res) => {
+            // Lấy và gán lại access token vào localStorage
+            const { accessToken } = res.data;
+            localStorage.setItem('accessToken', accessToken);
+            authorizedAxiosInstance.defaults.headers.Authorization = `Bearer ${accessToken}`;
+          })
+          .catch((_error) => {
+            // Nếu như nhận bất kỳ lỗi nào từ api refreshToken thì logout luôn
+            handleLogoutAPI().then(() => {
+              // Trường hợp dùng cookie thì nhớ xóa userInfo trong localStorage
+              // localStorage.removeItem('userInfo');
+              // Điều hướng tới trang login sau khi logout thành công
+              location.href = '/login';
+            });
+            return Promise.reject(_error);
+          })
+          .finally(() => {
+            // Xóa promise refreshTokenPromise khi đã gọi refreshToken API hoàn thành
+            refreshTokenPromise = null;
           });
-          return Promise.reject(_error);
-        });
+      }
+      // Cuối cùng return cái refreshTokenPromise trong trường hợp success
+      return refreshTokenPromise.then(() => {
+        // Trường hợp dùng cookie, return lại axios instance của chúng ta kết hợp với cái originalRequest để gọi lại những api ban đầu bị lỗi
+        return authorizedAxiosInstance(originalRequest);
+      });
     }
     // Dùng toastify để hiển thị bất kể mọi mã lỗi lên màn hình - Ngoại trừ mã 410 - GONE phục vụ cho việc tự động refresh lại token
     if (error.response?.status !== 410) {
