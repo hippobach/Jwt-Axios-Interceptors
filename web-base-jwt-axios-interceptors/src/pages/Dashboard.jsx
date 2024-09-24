@@ -8,6 +8,7 @@ import Divider from '@mui/material/Divider';
 import Typography from '@mui/material/Typography';
 import CircularProgress from '@mui/material/CircularProgress';
 
+import { handleLogoutAPI } from '~/apis';
 import { API_ROOT } from '~/utils/constants';
 import authorizedAxiosInstance from '~/utils/authorizedAxios';
 
@@ -26,13 +27,9 @@ function Dashboard() {
   }, []);
 
   const handleLogout = async () => {
-    // Với trường hợp dùng localStorage thì chỉ cần xóa thông tin user trong localStorage phía FE
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
-    localStorage.removeItem('userInfo');
-    // Với trường hợp dùng httpOnlyCookie thì sẽ gọi api để remove cookies
-    await authorizedAxiosInstance.delete(`${API_ROOT}/v1/users/logout`);
-    setUser(null);
+    await handleLogoutAPI();
+    // Trường hợp dùng cookie thì nhớ xóa userInfo trong localStorage
+    // localStorage.removeItem('userInfo');
     // Cuối cùng là điều hướng tới trang login sau khi logout thành công
     navigate('/login');
   };
